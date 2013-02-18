@@ -82,6 +82,8 @@ namespace QuantBox.OQ.CTP
         private readonly Dictionary<string, SingleOrder> _OrderRef2Order = new Dictionary<string, SingleOrder>();
         //一个Order可能分拆成多个报单，如可能由平今与平昨，或开新单组合而成
         private readonly Dictionary<SingleOrder, Dictionary<string, CThostFtdcOrderField>> _Orders4Cancel = new Dictionary<SingleOrder, Dictionary<string, CThostFtdcOrderField>>();
+        //用于某个变态需求
+        private readonly Dictionary<string, string> _OrderSysID2OrderRef = new Dictionary<string, string>();
 
         //记录账号的实际持仓，保证以最低成本选择开平
         private readonly DbInMemInvestorPosition _dbInMemInvestorPosition = new DbInMemInvestorPosition();
@@ -1085,6 +1087,8 @@ namespace QuantBox.OQ.CTP
                     pOrder.VolumeTotalOriginal, pOrder.VolumeTraded, pOrder.OrderSubmitStatus, pOrder.OrderStatus,
                     pOrder.OrderRef, pOrder.OrderSysID, pOrder.StatusMsg);
 
+            _OrderSysID2OrderRef[pOrder.OrderSysID] = pOrder.OrderRef;
+
             SingleOrder order;
             string strKey = string.Format("{0}:{1}:{2}", _RspUserLogin.FrontID, _RspUserLogin.SessionID, pOrder.OrderRef);
             if (_OrderRef2Order.TryGetValue(strKey, out order))
@@ -1205,9 +1209,13 @@ namespace QuantBox.OQ.CTP
                 TraderApi.TD_ReqQryInvestorPosition(m_pTdApi, pTrade.InstrumentID);
             }
 
+            //通于OrderSysID找到原始的OrderRef
+            string OrderRef = pTrade.OrderRef;
+            _OrderSysID2OrderRef.TryGetValue(pTrade.OrderSysID,out OrderRef);
+
             SingleOrder order;
             //找到自己发送的订单，标记成交
-            if (_OrderRef2Order.TryGetValue(string.Format("{0}:{1}:{2}", _RspUserLogin.FrontID, _RspUserLogin.SessionID, pTrade.OrderRef), out order))
+            if (_OrderRef2Order.TryGetValue(string.Format("{0}:{1}:{2}", _RspUserLogin.FrontID, _RspUserLogin.SessionID, OrderRef), out order))
             {
                 if (TThostFtdcTradeTypeType.CombinationDerived == pTrade.TradeType)
                 {
